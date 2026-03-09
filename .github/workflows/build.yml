@@ -1,28 +1,6 @@
 name: Build Kernel
 on:
   workflow_dispatch:
-    inputs:
-      BRANCH:
-        description: Kernel branch
-        default: 'main'
-        required: true
-      URL:
-        description: Repository URL
-        default: ''
-        required: true
-      SETUP_KSU:
-        description: Setup KernelSU
-        default: true
-        required: false
-        type: boolean
-      KSU_REPO:
-        description: KernelSU repository link
-        default: 'rsuntk/KernelSU'
-        required: false
-      KSU_BRANCH:
-        description: KernelSU branch
-        default: 'main'
-        required: false
 
 jobs:
   build:
@@ -41,7 +19,7 @@ jobs:
         sudo aptitude install libssl-dev -y
         
     - name: Clone Kernel Source
-      run: git clone --depth=1 --single-branch -b ${{ inputs.BRANCH }} ${{ inputs.URL }} kernel_root
+      run: git clone --depth=1 --single-branch -b master ${{ secrets.URL }} kernel_root
       working-directory: rootdir
 
     - name: Fetch toolchains
@@ -65,24 +43,6 @@ jobs:
       with:
         distribution: temurin
         java-version: 21
-
-    - name: Setup KernelSU
-      if: inputs.SETUP_KSU == true
-      run: |
-        cd kernel_root
-        rm $(pwd)/kernel-6.6/android/abi_gki_protected_exports_* || echo "[-] No gki protected exports!"
-        echo "[+] KernelSU setup"
-        git clone --single-branch -b ${{ inputs.KSU_BRANCH }} https://github.com/${{ inputs.KSU_REPO }}.git KernelSU
-        GKI_ROOT=$(pwd)
-        echo "[+] GKI_ROOT: $GKI_ROOT"
-        echo "[+] Copy KernelSU driver to $GKI_ROOT/kernel-6.6/drivers"
-        ln -sf $(pwd)/KernelSU/kernel $GKI_ROOT/kernel-6.6/drivers/kernelsu
-        echo "[+] Add KernelSU driver to Makefile"
-        DRIVER_MAKEFILE=$GKI_ROOT/kernel-6.6/drivers/Makefile
-        DRIVER_KCONFIG=$GKI_ROOT/kernel-6.6/drivers/Kconfig
-        grep -q "kernelsu" "$DRIVER_MAKEFILE" || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> "$DRIVER_MAKEFILE"
-        grep -q "kernelsu" "$DRIVER_KCONFIG" || sed -i "/endmenu/i\\source \"drivers/kernelsu/Kconfig\"" "$DRIVER_KCONFIG"
-      working-directory: rootdir
 
     - name: Build kernel
       id: buildKernel
