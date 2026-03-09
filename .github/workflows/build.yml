@@ -1,7 +1,12 @@
 name: Build Kernel
 on:
   workflow_dispatch:
-
+    inputs:
+      BRANCH:
+      URL:
+        description: Repository URL
+        default: 'https://github.com/rsuntkOrgs/android_kernel_samsung_a05m-6.6.git'
+        required: true
 jobs:
   build:
     runs-on: ubuntu-latest
