@@ -24,7 +24,7 @@ jobs:
         sudo aptitude install libssl-dev -y
         
     - name: Clone Kernel Source
-      run: git clone --depth=1 --single-branch -b master ${{ secrets.URL }} kernel_root
+      run: git clone --depth=1 --single-branch -b ${{ inputs.BRANCH }} ${{ inputs.URL }} kernel_root
       working-directory: rootdir
 
     - name: Fetch toolchains
