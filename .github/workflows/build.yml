@@ -42,7 +42,7 @@ jobs:
     - name: Prepare timezone fix
       run: |
         sudo rm /etc/localtime
-        sudo ln -s /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
+        sudo ln -s /usr/share/zoneinfo/Europe/Lisbon /etc/localtime
 
     - name: Setup Java
       uses: actions/setup-java@v5
