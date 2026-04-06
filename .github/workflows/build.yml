@@ -9,6 +9,7 @@ on:
         description: Repository URL
         default: 'https://github.com/dazui-py/A145R-RKSU.git'
         required: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,32 +19,30 @@ jobs:
         path: rootdir
         show-progress: false
         fetch-depth: 1
-        
+
     - name: Prepare dependencies
       run: |
         sudo apt update -y
-        sudo apt install rsync bc cpio flex bison aptitude aria2 git python-is-python3 tar perl wget curl lz4 -y
+        sudo apt install rsync bc cpio flex bison aptitude aria2 git python-is-python3 tar perl wget curl lz4 ccache -y
         sudo aptitude install libssl-dev -y
-        
+
     - name: Clone Kernel Source
-      run: git clone --depth=1 --single-branch -b ${{ inputs.BRANCH }} ${{ inputs.URL }} kernel_root
+      run: git clone --depth 1 --recurse-submodules --shallow-submodules --single-branch -b ${{ inputs.BRANCH }} ${{ inputs.URL }} kernel_root
       working-directory: rootdir
 
     - name: Fetch toolchains
       run: |
         cd kernel_root
-        # We divided it into 2 parts, because of Github Release limitations.
         aria2c https://github.com/rsuntkOrgs/android_kernel_samsung_a05m-6.6/releases/download/v1.0/xaa
         aria2c https://github.com/rsuntkOrgs/android_kernel_samsung_a05m-6.6/releases/download/v1.0/xab
         echo "INFO: Appending files and extracting ..."
-        cat xaa xab > toolchains.tar.gz && tar -xf toolchains.tar.gz && rm toolchains.tar.gz xaa xab
-        [ ! -f $(pwd)/xaa ] && echo "INFO: Extraction operation is completed." || exit 1
+        cat xaa xab > toolchains.tar.gz; tar -xf toolchains.tar.gz; rm toolchains.tar.gz xaa xab
       working-directory: rootdir
 
     - name: Prepare timezone fix
       run: |
         sudo rm /etc/localtime
-        sudo ln -s /usr/share/zoneinfo/Asia/Manila /etc/localtime
+        sudo ln -s /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
 
     - name: Setup Java
       uses: actions/setup-java@v5
@@ -55,14 +54,27 @@ jobs:
       id: buildKernel
       run: |
         cd kernel_root
-        # grep linux version
-        kernelVersion=$(cd kernel-6.6 && make kernelversion && cd ..)
-        [ -f $(pwd)/build_kernel.sh ] && bash build_kernel.sh || exit 1
-        [ ! -f $(pwd)/out/target/product/a14m/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/Image.gz ] && exit 1
-        cd out && find . -type f -name "Image.gz" && cd ..
-        gitsha1=$(git rev-parse --short HEAD)
-        buildDetails="`echo $kernelVersion`-A145R_`echo $gitsha1`-`date +'%Y%m%d%H%M%S'`" && echo "buildDetails=$buildDetails" >> $GITHUB_OUTPUT
-        cd .. && cp kernel_root/out/target/product/a14m/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/Image.gz external/anykernel3
+        BUILD_TIME=$(date +'%Y%m%d%H%M')
+        GIT_SHA=$(git rev-parse --short HEAD)
+        DETAILS="A145R-${GIT_SHA}-${BUILD_TIME}"
+        
+        bash build_kernel.sh
+
+        IMAGE_FILE="out/target/product/a14m/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/Image.gz"
+        
+        if [ ! -f "$IMAGE_FILE" ]; then
+          echo "::error::Kernel Image.gz not found!"
+          exit 1
+        fi
+
+        cp "$IMAGE_FILE" ../external/anykernel3/
+        
+        pushd ../external/anykernel3
+        zip -r9 "../../${DETAILS}.zip" *
+        popd
+
+        echo "buildDetails=${DETAILS}" >> $GITHUB_OUTPUT
+        echo "zipPath=$(pwd)/../${DETAILS}.zip" >> $GITHUB_OUTPUT
       working-directory: rootdir
 
     - name: List trees
@@ -85,7 +97,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: Image_GZ-${{ steps.buildKernel.outputs.buildDetails }}
-        path: rootdir/kernel_root/out/target/product/a14m/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/Image.gz"
+        path: rootdir/kernel_root/out/target/product/a14m/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/Image.gz
         compression-level: 9
 
     - name: Upload LKM
@@ -95,3 +107,19 @@ jobs:
         name: LKM-${{ steps.buildKernel.outputs.buildDetails }}
         path: rootdir/kernel_root/out/target/product/a14m/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/drivers/*
         compression-level: 9
+
+    - name: Upload to telegram
+      env:
+        CHAT_ID: ${{ secrets.CHAT_ID }}
+        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        TITLE: "Galaxy A14 Kernel"
+      run: |
+        if [ ! -z "${{ secrets.BOT_TOKEN }}" ]; then
+          export VERSION=$(cd kernel_root && git rev-list --count HEAD)
+          ZIP=${{ steps.buildKernel.outputs.zipPath }}
+          export MD5SUM="$(md5sum $ZIP | cut -d' ' -f1)"
+          pip3 install telethon
+          python3 scripts/bot.py $ZIP
+        fi
+      working-directory: rootdir
