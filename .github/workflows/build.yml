@@ -33,8 +33,8 @@ jobs:
     - name: Fetch toolchains
       run: |
         cd kernel_root
-        aria2c https://github.com/rsuntkOrgs/android_kernel_samsung_a05m-6.6/releases/download/v1.0/xaa
-        aria2c https://github.com/rsuntkOrgs/android_kernel_samsung_a05m-6.6/releases/download/v1.0/xab
+        aria2c https://github.com/dazui-py/android_kernel_samsung_a14m-6.6/releases/download/v1.0/xaa
+        aria2c https://github.com/dazui-py/android_kernel_samsung_a14m-6.6/releases/download/v1.0/xab
         echo "INFO: Appending files and extracting ..."
         cat xaa xab > toolchains.tar.gz; tar -xf toolchains.tar.gz; rm toolchains.tar.gz xaa xab
       working-directory: rootdir
@@ -50,7 +50,7 @@ jobs:
         distribution: temurin
         java-version: 21
 
-    - name: Build kernel
+    - name: Cooking the kernel
       id: buildKernel
       run: |
         cd kernel_root
@@ -108,12 +108,12 @@ jobs:
         path: rootdir/kernel_root/out/target/product/a14m/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/drivers/*
         compression-level: 9
 
-    - name: Upload to telegram
+    - name: Upload to Telegram
       env:
         CHAT_ID: ${{ secrets.CHAT_ID }}
         BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        TITLE: "Galaxy A14 Kernel"
+        TITLE: "Samsung A145RXXSCDZA1 Kernel (Beta)"
       run: |
         if [ ! -z "${{ secrets.BOT_TOKEN }}" ]; then
           export VERSION=$(cd kernel_root && git rev-list --count HEAD)
