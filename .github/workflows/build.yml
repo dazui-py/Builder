@@ -1,18 +1,78 @@
 name: Build Kernel
+
 on:
   workflow_dispatch:
     inputs:
       BRANCH:
-        default: 'KSU'
+        default: 'susfs-integration'
         description: Repository branch
+
       URL:
         description: Repository URL
-        default: 'https://github.com/dazui-py/A145R-RKSU.git'
+        default: 'https://github.com/dazui-py/a145r-ksu-reborn.git'
         required: true
+
+      createTar:
+        description: "Create Odin Tar"
+        required: true
+        default: "yes"
+        type: choice
+        options:
+          - yes
+          - no
+
+      repackBoot:
+        description: "Repack boot.img with built Image.gz"
+        required: true
+        default: "yes"
+        type: choice
+        options:
+          - yes
+          - no
+
+      bootSource:
+        description: "boot.img source"
+        required: true
+        default: "default"
+        type: choice
+        options:
+          - default
+          - url
+
+      bootUrl:
+        description: "boot.img URL"
+        required: false
+        default: ""
+        type: string
+
+      includeInitBoot:
+        description: "Include init_boot.img in tar"
+        required: true
+        default: "yes"
+        type: choice
+        options:
+          - yes
+          - no
+
+      initBootSource:
+        description: "init_boot.img source"
+        required: true
+        default: "default"
+        type: choice
+        options:
+          - default
+          - url
+
+      initBootUrl:
+        description: "init_boot.img URL"
+        required: false
+        default: ""
+        type: string
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
     - uses: actions/checkout@v4
       with:
@@ -23,7 +83,7 @@ jobs:
     - name: Prepare dependencies
       run: |
         sudo apt update -y
-        sudo apt install rsync bc cpio flex bison aptitude aria2 git python-is-python3 tar perl wget curl lz4 ccache -y
+        sudo apt install rsync bc cpio flex bison aptitude aria2 git python-is-python3 tar perl wget curl lz4 ccache file zip -y
         sudo aptitude install libssl-dev -y
 
     - name: Clone Kernel Source
@@ -33,15 +93,19 @@ jobs:
     - name: Fetch toolchains
       run: |
         cd kernel_root
+
         aria2c https://github.com/dazui-py/android_kernel_samsung_a14m-6.6/releases/download/v1.0/xaa
         aria2c https://github.com/dazui-py/android_kernel_samsung_a14m-6.6/releases/download/v1.0/xab
+
         echo "INFO: Appending files and extracting ..."
-        cat xaa xab > toolchains.tar.gz; tar -xf toolchains.tar.gz; rm toolchains.tar.gz xaa xab
+        cat xaa xab > toolchains.tar.gz
+        tar -xf toolchains.tar.gz
+        rm toolchains.tar.gz xaa xab
       working-directory: rootdir
 
     - name: Prepare timezone fix
       run: |
-        sudo rm /etc/localtime
+        sudo rm -f /etc/localtime
         sudo ln -s /usr/share/zoneinfo/Europe/Lisbon /etc/localtime
 
     - name: Setup Java
@@ -53,28 +117,180 @@ jobs:
     - name: Cooking the kernel
       id: buildKernel
       run: |
+        set -euo pipefail
+
         cd kernel_root
+
         BUILD_TIME=$(date +'%Y%m%d%H%M')
         GIT_SHA=$(git rev-parse --short HEAD)
         DETAILS="A145R-${GIT_SHA}-${BUILD_TIME}"
-        
+
         bash build_kernel.sh
 
         IMAGE_FILE="out/target/product/a14m/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/Image.gz"
-        
+
         if [ ! -f "$IMAGE_FILE" ]; then
           echo "::error::Kernel Image.gz not found!"
           exit 1
         fi
 
         cp "$IMAGE_FILE" ../external/anykernel3/
-        
+
         pushd ../external/anykernel3
         zip -r9 "../../${DETAILS}.zip" *
         popd
 
-        echo "buildDetails=${DETAILS}" >> $GITHUB_OUTPUT
-        echo "zipPath=$(pwd)/../${DETAILS}.zip" >> $GITHUB_OUTPUT
+        echo "buildDetails=${DETAILS}" >> "$GITHUB_OUTPUT"
+        echo "zipPath=$(pwd)/../${DETAILS}.zip" >> "$GITHUB_OUTPUT"
+        echo "imagePath=$(pwd)/$IMAGE_FILE" >> "$GITHUB_OUTPUT"
+      working-directory: rootdir
+
+    - name: Create Odin Tar
+      id: odinTar
+      if: ${{ inputs.createTar == 'yes' }}
+      run: |
+        set -euo pipefail
+
+        DETAILS="${{ steps.buildKernel.outputs.buildDetails }}"
+        IMAGE_GZ="${{ steps.buildKernel.outputs.imagePath }}"
+
+        BOOT_SOURCE="${{ inputs.bootSource }}"
+        BOOT_URL="${{ inputs.bootUrl }}"
+        INIT_BOOT_SOURCE="${{ inputs.initBootSource }}"
+        INIT_BOOT_URL="${{ inputs.initBootUrl }}"
+
+        OUT_DIR="odin-${DETAILS}"
+        TAR_NAME="${DETAILS}.tar"
+
+        DEFAULT_BOOT_IMG="external/default-boot_img/boot.img"
+        DEFAULT_INIT_BOOT_IMG="external/default-boot_img/init_boot.img"
+        MAGISKBOOT="external/magiskboot/magiskboot"
+
+        rm -rf "$OUT_DIR" repack-work
+        mkdir -p "$OUT_DIR"
+
+        echo "Preparing boot.img..."
+
+        if [ "$BOOT_SOURCE" = "url" ]; then
+          if [ -z "$BOOT_URL" ]; then
+            echo "::error::boot.img source is url, but boot.img URL is empty."
+            exit 1
+          fi
+
+          curl -fL --retry 3 -o "$OUT_DIR/boot.img" "$BOOT_URL"
+        else
+          if [ ! -f "$DEFAULT_BOOT_IMG" ]; then
+            echo "::error::Default boot.img not found: $DEFAULT_BOOT_IMG"
+            exit 1
+          fi
+
+          cp "$DEFAULT_BOOT_IMG" "$OUT_DIR/boot.img"
+        fi
+
+        test -s "$OUT_DIR/boot.img"
+
+        if [ "${{ inputs.repackBoot }}" = "yes" ]; then
+          echo "Repacking boot.img with built Image.gz..."
+
+          if [ ! -f "$IMAGE_GZ" ]; then
+            echo "::error::Built Image.gz not found: $IMAGE_GZ"
+            exit 1
+          fi
+
+          if [ ! -f "$MAGISKBOOT" ]; then
+            echo "::error::magiskboot not found: $MAGISKBOOT"
+            exit 1
+          fi
+
+          chmod +x "$MAGISKBOOT"
+
+          gzip -t "$IMAGE_GZ"
+
+          mkdir -p repack-work
+          cp "$OUT_DIR/boot.img" repack-work/boot.img
+          cp "$IMAGE_GZ" repack-work/Image.gz
+
+          pushd repack-work
+
+          ../"$MAGISKBOOT" unpack boot.img
+
+          if [ ! -f kernel ]; then
+            echo "::error::magiskboot did not extract a kernel file from boot.img"
+            ls -la
+            exit 1
+          fi
+
+          echo "Original kernel:"
+          file kernel || true
+          ls -lh kernel
+
+          echo "Built Image.gz:"
+          file Image.gz || true
+          ls -lh Image.gz
+
+          cp -f Image.gz kernel
+
+          ../"$MAGISKBOOT" repack boot.img boot-repacked.img
+
+          if [ ! -f boot-repacked.img ]; then
+            echo "::error::Failed to create repacked boot.img"
+            ls -la
+            exit 1
+          fi
+
+          popd
+
+          cp -f repack-work/boot-repacked.img "$OUT_DIR/boot.img"
+          rm -rf repack-work
+        else
+          echo "Repack boot.img: no"
+          echo "Keeping boot.img unchanged."
+        fi
+
+        if [ "${{ inputs.includeInitBoot }}" = "yes" ]; then
+          echo "Preparing init_boot.img..."
+
+          if [ "$INIT_BOOT_SOURCE" = "url" ]; then
+            if [ -z "$INIT_BOOT_URL" ]; then
+              echo "::error::init_boot.img source is url, but init_boot.img URL is empty."
+              exit 1
+            fi
+
+            curl -fL --retry 3 -o "$OUT_DIR/init_boot.img" "$INIT_BOOT_URL"
+          else
+            if [ ! -f "$DEFAULT_INIT_BOOT_IMG" ]; then
+              echo "::error::Default init_boot.img not found: $DEFAULT_INIT_BOOT_IMG"
+              exit 1
+            fi
+
+            cp "$DEFAULT_INIT_BOOT_IMG" "$OUT_DIR/init_boot.img"
+          fi
+
+          test -s "$OUT_DIR/init_boot.img"
+        else
+          echo "Include init_boot.img in tar: no"
+          echo "Tar will contain only boot.img."
+        fi
+
+        echo "Files that will be added to Odin tar:"
+        ls -lh "$OUT_DIR"
+
+        pushd "$OUT_DIR"
+
+        if [ -f init_boot.img ]; then
+          tar --format=ustar -cvf "../$TAR_NAME" boot.img init_boot.img
+        else
+          tar --format=ustar -cvf "../$TAR_NAME" boot.img
+        fi
+
+        popd
+
+        test -s "$TAR_NAME"
+
+        echo "Created Odin tar:"
+        ls -lh "$TAR_NAME"
+
+        echo "tarPath=$(pwd)/$TAR_NAME" >> "$GITHUB_OUTPUT"
       working-directory: rootdir
 
     - name: List trees
@@ -108,6 +324,14 @@ jobs:
         path: rootdir/kernel_root/out/target/product/a14m/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/drivers/*
         compression-level: 9
 
+    - name: Upload Odin Tar
+      if: ${{ inputs.createTar == 'yes' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: Odin-Tar-${{ steps.buildKernel.outputs.buildDetails }}
+        path: ${{ steps.odinTar.outputs.tarPath }}
+        compression-level: 0
+
     - name: Upload to Telegram
       env:
         CHAT_ID: ${{ secrets.CHAT_ID }}
@@ -118,8 +342,8 @@ jobs:
         if [ ! -z "${{ secrets.BOT_TOKEN }}" ]; then
           export VERSION=$(cd kernel_root && git rev-list --count HEAD)
           ZIP=${{ steps.buildKernel.outputs.zipPath }}
-          export MD5SUM="$(md5sum $ZIP | cut -d' ' -f1)"
+          export MD5SUM="$(md5sum "$ZIP" | cut -d' ' -f1)"
           pip3 install telethon
-          python3 scripts/bot.py $ZIP
+          python3 scripts/bot.py "$ZIP"
         fi
       working-directory: rootdir

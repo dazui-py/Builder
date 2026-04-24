@@ -4,7 +4,7 @@
 ### AnyKernel setup
 # global properties
 properties() { '
-kernel.string=rsuntk kernel @ rsuntkOrgs
+kernel.string=dazuii kernel @ dazuii-py
 do.devicecheck=0
 do.modules=0
 do.systemless=0
