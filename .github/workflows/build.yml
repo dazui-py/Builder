@@ -14,21 +14,21 @@ on:
 
       createTar:
         description: "Create Odin Tar"
-        required: yes
-        default: "yes"
+        required: true
+        default: "true"
         type: choice
         options:
-          - yes
-          - no
+          - true
+          - false
 
       repackBoot:
         description: "Repack boot.img with built Image.gz"
-        required: yes
-        default: "yes"
+        required: true
+        default: "true"
         type: choice
         options:
-          - yes
-          - no
+          - true
+          - false
 
       bootSource:
         description: "boot.img source"
@@ -47,12 +47,12 @@ on:
 
       includeInitBoot:
         description: "Include init_boot.img in tar"
-        required: yes
-        default: "yes"
+        required: true
+        default: "true"
         type: choice
         options:
-          - yes
-          - no
+          - true
+          - false
 
       initBootSource:
         description: "init_boot.img source"
