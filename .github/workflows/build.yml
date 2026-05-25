@@ -14,7 +14,7 @@ on:
 
       createTar:
         description: "Create Odin Tar"
-        required: true
+        required: yes
         default: "yes"
         type: choice
         options:
@@ -23,7 +23,7 @@ on:
 
       repackBoot:
         description: "Repack boot.img with built Image.gz"
-        required: true
+        required: yes
         default: "yes"
         type: choice
         options:
@@ -47,7 +47,7 @@ on:
 
       includeInitBoot:
         description: "Include init_boot.img in tar"
-        required: true
+        required: yes
         default: "yes"
         type: choice
         options:
