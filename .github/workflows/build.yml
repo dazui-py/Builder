@@ -118,22 +118,22 @@ jobs:
       run: |
         cd kernel_root
 
-        if [ -e kernel_root/kernel-6.6/KernelSU/.git-ignore ] && [ ! -e kernel_root/kernel-6.6/KernelSU/.git ]; then
-          mv kernel_root/kernel-6.6/KernelSU/.git-ignore kernel_root/kernel-6.6/KernelSU/.git
+        if [ -e kernel-6.6/KernelSU/.git-ignore ] && [ ! -e kernel-6.6/KernelSU/.git ]; then
+          mv kernel-6.6/KernelSU/.git-ignore kernel-6.6/KernelSU/.git
         fi
 
-        ls -la kernel_root/kernel-6.6/KernelSU | head
+        ls -la kernel-6.6/KernelSU | head
       working-directory: rootdir
 
     - name: Fix Baseband-Guard git folder
       run: |
         cd kernel_root
 
-        if [ -e kernel_root/kernel-6.6/Baseband-guard/.git-ignore ] && [ ! -e kernel_root/kernel-6.6/Baseband-guard/.git ]; then
-          mv kernel_root/kernel-6.6/Baseband-guard/.git-ignore kernel_root/kernel-6.6/Baseband-guard/.git
+        if [ -e kernel-6.6/Baseband-guard/.git-ignore ] && [ ! -e kernel-6.6/Baseband-guard/.git ]; then
+          mv kernel-6.6/Baseband-guard/.git-ignore kernel-6.6/Baseband-guard/.git
         fi
 
-        ls -la kernel_root/kernel-6.6/Baseband-guard | head
+        ls -la kernel-6.6/Baseband-guard | head
       working-directory: rootdir
 
     - name: Cooking the kernel
