@@ -90,6 +90,11 @@ jobs:
       run: git clone --depth 1 --recurse-submodules --shallow-submodules --single-branch -b ${{ inputs.BRANCH }} ${{ inputs.URL }} kernel_root
       working-directory: rootdir
 
+    - name: Show paths
+      run: |
+        echo "rootdir: $(realpath rootdir)"
+        echo "kernel_root: $(realpath rootdir/kernel_root)"
+        echo "pwd: $(pwd)"
     - name: Fetch toolchains
       run: |
         cd kernel_root
