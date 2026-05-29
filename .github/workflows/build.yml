@@ -84,7 +84,7 @@ jobs:
       run: |
         sudo apt update -y
         sudo apt install rsync bc cpio flex bison aptitude aria2 git python-is-python3 tar perl wget curl lz4 ccache file zip -y
-        sudo aptitude install libssl-dev -y
+        sudo aptitude install libssl-dev eza -y
 
     - name: Clone Kernel Source
       run: git clone --depth 1 --recurse-submodules --shallow-submodules --single-branch -b ${{ inputs.BRANCH }} ${{ inputs.URL }} kernel_root
@@ -95,7 +95,7 @@ jobs:
         echo "rootdir: $(realpath rootdir)"
         echo "kernel_root: $(realpath rootdir/kernel_root)"
         echo "pwd: $(pwd)"
-        echo "lst: $(ls --tree $GITHUB_WORKSPACE)"
+        echo "lst: $(eza --tree $GITHUB_WORKSPACE)"
         
     - name: Fetch toolchains
       run: |
