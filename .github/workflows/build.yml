@@ -131,7 +131,7 @@ jobs:
         fi
 
         ls -la kernel-6.6/KernelSU | head
-        sed -i 's|KSU_SRC := .*|KSU_SRC := /home/runner/work/Builder/Builder/rootdir/kernel_root/KernelSU/kernel|' kernel-6.6/KernelSU/kernel/Kbuild
+        sed -i 's|KSU_SRC := .*|KSU_SRC := /home/runner/work/Builder/Builder/rootdir/kernel_root/kernel-6.6/KernelSU/kernel|' kernel-6.6/KernelSU/kernel/Kbuild
 
       working-directory: rootdir
 
