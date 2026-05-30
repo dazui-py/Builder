@@ -96,7 +96,9 @@ jobs:
         echo "kernel_root: $(realpath rootdir/kernel_root)"
         echo "pwd: $(pwd)"
         echo "lst: $(eza --tree $GITHUB_WORKSPACE)"
-        
+        echo "ls rootdir: $(ls rootdir)"
+        echo "ls kernel_root: $(ls kernel_root)"
+
     - name: Fetch toolchains
       run: |
         cd kernel_root
