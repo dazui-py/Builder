@@ -221,7 +221,7 @@ jobs:
 
         test -s "$OUT_DIR/boot.img"
 
-        if [ "${{ inputs.repackBoot }}" = "yes" ]; then
+        if [ "${{ inputs.repackBoot }}" = "true" ]; then
           echo "Repacking boot.img with built Image.gz..."
 
           if [ ! -f "$IMAGE_GZ" ]; then
@@ -279,7 +279,7 @@ jobs:
           echo "Keeping boot.img unchanged."
         fi
 
-        if [ "${{ inputs.includeInitBoot }}" = "yes" ]; then
+        if [ "${{ inputs.includeInitBoot }}" = "true" ]; then
           echo "Preparing init_boot.img..."
 
           if [ "$INIT_BOOT_SOURCE" = "url" ]; then
